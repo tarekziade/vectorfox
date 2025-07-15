@@ -6,15 +6,21 @@ from tqdm import tqdm
 import hashlib
 import os
 from bs4 import BeautifulSoup
+from urllib.parse import urldefrag
 
 BASE_URL = "https://firefox-source-docs.mozilla.org/"
 COLLECTION_NAME = "firefox_docs"
 QDRANT_PATH = "qdrant_data"
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-MAX_PAGES = 1000
+MAX_PAGES = 2000
 VISITED = set()
 
 client = QdrantClient(path=QDRANT_PATH)
+
+
+def normalize_url(url: str) -> str:
+    """Removes URL fragments (e.g., #section-name)"""
+    return urldefrag(url)[0]
 
 
 def hash_id(url: str) -> int:
@@ -78,7 +84,9 @@ def fetch_page(url: str) -> tuple[str | None, str | None, list[str]]:
         main = soup.select_one("main") or soup.body
         if main:
             clean_text = main.get_text(separator="\n")
-            links = extract_html_links(html, base_url=url)
+            links = [
+                normalize_url(link) for link in extract_html_links(html, base_url=url)
+            ]
             html_text = clean_text.strip()
 
         return rst_text, html_text, links
@@ -129,7 +137,7 @@ def crawl_and_index(start_url: str):
 
     with tqdm(total=MAX_PAGES) as pbar:
         while queue and len(VISITED) < MAX_PAGES:
-            url = queue.pop(0)
+            url = normalize_url(queue.pop(0))
             if url in VISITED or not url.startswith(BASE_URL):
                 continue
             VISITED.add(url)
@@ -152,8 +160,10 @@ def crawl_and_index(start_url: str):
                 ids=ids,
                 payload=payloads,
             )
+            queue.extend(
+                [normalize_url(l) for l in new_links if normalize_url(l) not in VISITED]
+            )
 
-            queue.extend([link for link in new_links if link not in VISITED])
             pbar.update(1)
 
 
