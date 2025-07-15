@@ -1,14 +1,13 @@
+
 PYTHON=python3
 
 VENV=.venv
 REQS=requirements.txt
-SCRIPT=index_firefox_docs.py
-COLLECTION_INIT_SCRIPT=init_qdrant_collection.py
-
+SCRIPT=index.py
 QDRANT_CONTAINER_NAME=qdrant
 QDRANT_PORT=6333
 
-.PHONY: all setup run clean qdrant-up init-collection
+.PHONY: all setup run clean qdrant-up 
 
 all: setup
 
@@ -26,8 +25,8 @@ qdrant-up:
 		-p 6334:6334 \
 		qdrant/qdrant
 
-init-collection:
-	. $(VENV)/bin/activate && $(PYTHON) $(COLLECTION_INIT_SCRIPT)
+search:
+	. $(VENV)/bin/activate && $(PYTHON) cli.py "$(q)"
 
 clean:
 	rm -rf __pycache__ .cache $(VENV)

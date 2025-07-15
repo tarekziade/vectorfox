@@ -1,21 +1,23 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct
+from qdrant_client import QdrantClient, models
 from tqdm import tqdm
 import hashlib
+import os
 
 BASE_URL = "https://firefox-source-docs.mozilla.org/"
 COLLECTION_NAME = "firefox_docs"
-VISITED = set()
+QDRANT_PATH = "qdrant_data"
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 MAX_PAGES = 200
+VISITED = set()
 
-qdrant = QdrantClient(host="localhost", port=6333)
+client = QdrantClient(path=QDRANT_PATH)
 
 
-def hash_id(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def hash_id(url: str, i: int) -> int:
+    return int(hashlib.sha256(f"{url}#{i}".encode()).hexdigest(), 16) % (10**18)
 
 
 def extract_links_and_text(url: str):
@@ -55,8 +57,20 @@ def chunk_text(text: str, max_tokens: int = 500):
     return chunks
 
 
+def ensure_collection():
+    if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:
+        dim = client.get_embedding_size(MODEL_NAME)
+        client.create_collection(
+            COLLECTION_NAME,
+            vectors_config=models.VectorParams(
+                size=dim, distance=models.Distance.COSINE
+            ),
+        )
+
+
 def crawl_and_index(start_url: str):
     queue = [start_url]
+    ensure_collection()
 
     with tqdm(total=MAX_PAGES) as pbar:
         while queue and len(VISITED) < MAX_PAGES:
@@ -70,17 +84,21 @@ def crawl_and_index(start_url: str):
 
             if text:
                 chunks = chunk_text(text)
-                points = [
-                    PointStruct(
-                        id=hash_id(url + f"#{i}"),
-                        vector=None,  # Will be created automatically
-                        payload={"url": url, "text": chunk},
-                    )
-                    for i, chunk in enumerate(chunks)
+                documents = [
+                    models.Document(text=chunk, model=MODEL_NAME) for chunk in chunks
                 ]
-                qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+                payloads = [{"url": url, "text": chunk} for chunk in chunks]
+                ids = [hash_id(url, i) for i in range(len(chunks))]
+
+                client.upload_collection(
+                    collection_name=COLLECTION_NAME,
+                    vectors=documents,
+                    ids=ids,
+                    payload=payloads,
+                )
             pbar.update(1)
 
 
 if __name__ == "__main__":
+    os.makedirs(QDRANT_PATH, exist_ok=True)
     crawl_and_index(BASE_URL)
