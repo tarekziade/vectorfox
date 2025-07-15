@@ -7,6 +7,20 @@ MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 client = QdrantClient(path=QDRANT_PATH)
 
+from transformers import pipeline
+
+# Load the QA model once
+qa = pipeline("question-answering", model="distilbert-base-cased-distilled-squad")
+
+
+# should be provided directly by qdrant
+def extract_answer(question: str, context: str) -> str:
+    try:
+        result = qa(question=question, context=context)
+        return result["answer"]
+    except Exception:
+        return context[:250]  # fallback
+
 
 def search(query_text: str, top_k: int = 5):
     query_doc = models.Document(text=query_text, model=MODEL_NAME)
@@ -17,9 +31,11 @@ def search(query_text: str, top_k: int = 5):
     print(f'\n🔍 Top {top_k} results for: "{query_text}"\n' + "-" * 60)
     for i, point in enumerate(results.points, 1):
         payload = point.payload or {}
-        text_snippet = payload.get("text", "").strip().replace("\n", " ")
+        context = payload["text"].get("text", "")
         url = payload.get("url", "N/A")
-        print(f"{i}. [URL] {url}\n   [Text] {text_snippet[:250]}...\n")
+
+        answer = extract_answer(query_text, context)
+        print(f"{i}. [URL] {url}\n   [Answer] {answer}\n")
 
 
 def main():
