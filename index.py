@@ -11,7 +11,7 @@ BASE_URL = "https://firefox-source-docs.mozilla.org/"
 COLLECTION_NAME = "firefox_docs"
 QDRANT_PATH = "qdrant_data"
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-MAX_PAGES = 500
+MAX_PAGES = 1000
 VISITED = set()
 
 client = QdrantClient(path=QDRANT_PATH)
