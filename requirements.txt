@@ -4,3 +4,6 @@ tqdm>=4.66.2
 qdrant-client>=1.7.0
 fastembed
 openai
+fastapi 
+uvicorn 
+requests

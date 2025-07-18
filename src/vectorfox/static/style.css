@@ -1,0 +1,50 @@
+body {
+    font-family: sans-serif;
+    padding: 2em;
+    max-width: 800px;
+    margin: auto;
+}
+
+textarea, input {
+    width: 100%;
+    padding: 0.5em;
+    margin-top: 1em;
+}
+
+.status-box {
+    padding: 0.5em 1em;
+    margin-top: 1em;
+    background: #f0f0f0;
+    border-left: 5px solid #888;
+}
+
+.status-done {
+    border-left-color: green;
+}
+
+.hidden {
+    display: none;
+}
+
+#loader span {
+    animation: blink 1s infinite;
+    font-size: 1.2em;
+}
+
+@keyframes blink {
+    0% { opacity: 0.2; }
+    50% { opacity: 1; }
+    100% { opacity: 0.2; }
+}
+
+#output {
+    background: #f8f8f8;
+    padding: 1em;
+    border-radius: 5px;
+    margin-top: 1em;
+}
+
+#sources {
+    margin-top: 1em;
+}
+

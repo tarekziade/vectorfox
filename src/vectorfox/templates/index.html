@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firefox Docs RAG</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="/static/main.js"></script>
+</head>
+<body>
+    <h2>Firefox Docs RAG + Ollama</h2>
+    <form id="rag-form">
+        <textarea name="query" placeholder="Ask a question about the Firefox codebase..." rows="4"></textarea>
+        <input type="submit" value="Ask" />
+    </form>
+
+    <div id="search-status" class="status-box hidden">Searching documentation...</div>
+    <div id="llm-status" class="status-box hidden">Calling Ollama... <span id="loader">...</span></div>
+
+    <div id="response-block" class="hidden">
+        <h3>Response</h3>
+        <div id="output"></div>
+    </div>
+
+    <div id="sources-block" class="hidden">
+        <h3>Sources</h3>
+        <ul id="sources"></ul>
+    </div>
+</body>
+</html>
