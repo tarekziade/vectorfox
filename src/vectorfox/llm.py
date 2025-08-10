@@ -13,6 +13,12 @@ PROVIDER = config.get("provider", "ollama")
 OLLAMA_MODEL = config["ollama"]["model"]
 OLLAMA_CHAT_URL = config["ollama"]["url"]
 
+
+VERTEX_REGION = config["vertex"]["region"]
+VERTEX_PROJECT_ID = config["vertex"]["project_id"]
+VERTEX_MODEL_ID = config["vertex"]["model_id"]
+
+
 # OpenAI settings
 if PROVIDER == "openai":
     import openai
@@ -103,6 +109,46 @@ def stream_openai(model: str, system_prompt: str, user_prompt: str, sse: bool):
         yield wrap(f"OpenAI error: {str(e)}")
 
 
+def stream_vertexai(prompt: str, sse: bool) -> Generator[str, None, None]:
+    def wrap(msg):
+        return f"data: {msg}\n\n" if sse else msg
+
+    # Get access token via gcloud subprocess
+    process = subprocess.Popen(
+        "gcloud auth print-access-token", stdout=subprocess.PIPE, shell=True
+    )
+    access_token_bytes, _ = process.communicate()
+    access_token = access_token_bytes.decode("utf-8").strip()
+
+    url = (
+        f"https://{VERTEX_REGION}-aiplatform.googleapis.com/v1/projects/"
+        f"{VERTEX_PROJECT_ID}/locations/{VERTEX_REGION}/publishers/"
+        f"mistralai/models/{VERTEX_MODEL_ID}:rawPredict"
+    )
+
+    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
+    payload = {
+        "model": VERTEX_MODEL_ID,
+        "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+
+    if response.status_code != 200:
+        yield wrap(f"Vertex AI error: {response.status_code} {response.text}")
+        return
+
+    try:
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        yield wrap(content)
+    except Exception as e:
+        yield wrap(f"Error parsing Vertex response: {str(e)}\nRaw: {response.text}")
+
+    yield wrap("[DONE]")
+
+
 def chat_completion(prompt: str, sse: bool = True):
     system_prompt = (
         "You are a concise assistant answering technical questions about the Firefox codebase. "
@@ -111,5 +157,7 @@ def chat_completion(prompt: str, sse: bool = True):
 
     if PROVIDER == "openai":
         return stream_openai(OPENAI_MODEL, system_prompt, prompt, sse)
+    elif PROVIDER == "vertex":
+        return stream_vertexai(prompt, sse)
     else:
         return stream_ollama(OLLAMA_MODEL, system_prompt, prompt, sse)
