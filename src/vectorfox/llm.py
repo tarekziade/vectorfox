@@ -2,8 +2,8 @@ import os
 import requests
 import json
 from fastapi.responses import StreamingResponse
+from typing import List, Tuple, Generator
 
-from typing import List, Tuple
 
 with open(os.path.join(os.path.dirname(__file__), "config.json")) as f:
     config = json.load(f)
