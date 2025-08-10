@@ -51,9 +51,7 @@ Question: {query}
 Answer:"""
 
 
-def stream_ollama(
-    model: str, system_prompt: str, user_prompt: str, sse: bool
-) -> Generator[str, None, None]:
+def stream_ollama(model: str, system_prompt: str, user_prompt: str, sse: bool):
     def wrap(msg):
         return f"data: {msg}\n\n" if sse else msg
 
