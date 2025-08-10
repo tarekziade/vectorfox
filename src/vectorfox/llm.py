@@ -4,8 +4,21 @@ from fastapi.responses import StreamingResponse
 
 from typing import List, Tuple
 
-LLM_MODEL = "granite3.3:8b"
-OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
+with open("config.json") as f:
+    config = json.load(f)
+
+PROVIDER = config.get("provider", "ollama")
+
+# Ollama settings
+OLLAMA_MODEL = config["ollama"]["model"]
+OLLAMA_CHAT_URL = config["ollama"]["url"]
+
+# OpenAI settings
+if PROVIDER == "openai":
+    import openai
+
+    OPENAI_MODEL = config["openai"]["model"]
+    openai.api_key = config["openai"]["api_key"]
 
 
 def build_rag_prompt(context_blocks: List[Tuple[str, str]], query: str) -> str:
@@ -31,11 +44,11 @@ Question: {query}
 Answer:"""
 
 
-def stream_ollama(model: str, system_prompt: str, user_prompt: str, sse: bool):
+def stream_ollama(
+    model: str, system_prompt: str, user_prompt: str, sse: bool
+) -> Generator[str, None, None]:
     def wrap(msg):
-        if sse:
-            return f"data: {msg}\n\n"
-        return msg
+        return f"data: {msg}\n\n" if sse else msg
 
     response = requests.post(
         OLLAMA_CHAT_URL,
@@ -49,6 +62,7 @@ def stream_ollama(model: str, system_prompt: str, user_prompt: str, sse: bool):
         },
         stream=True,
     )
+
     if response.status_code != 200:
         yield wrap(f"Ollama error: {response.status_code} {response.text}")
         return
@@ -62,10 +76,40 @@ def stream_ollama(model: str, system_prompt: str, user_prompt: str, sse: bool):
     yield wrap("[DONE]")
 
 
+def stream_openai(model: str, system_prompt: str, user_prompt: str, sse: bool):
+    import openai
+
+    def wrap(msg):
+        return f"data: {msg}\n\n" if sse else msg
+
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            stream=True,
+        )
+
+        for chunk in response:
+            delta = chunk["choices"][0]["delta"]
+            if "content" in delta:
+                yield wrap(delta["content"])
+
+        yield wrap("[DONE]")
+
+    except Exception as e:
+        yield wrap(f"OpenAI error: {str(e)}")
+
+
 def chat_completion(prompt: str, sse: bool = True):
     system_prompt = (
         "You are a concise assistant answering technical questions about the Firefox codebase. "
         "Do not show internal reasoning or say 'thinking'. Just answer clearly and directly."
     )
 
-    return stream_ollama(LLM_MODEL, system_prompt, prompt, sse)
+    if PROVIDER == "openai":
+        return stream_openai(OPENAI_MODEL, system_prompt, prompt, sse)
+    else:
+        return stream_ollama(OLLAMA_MODEL, system_prompt, prompt, sse)

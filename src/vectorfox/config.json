@@ -1,0 +1,11 @@
+{
+  "provider": "openai", // "ollama" or "openai"
+  "ollama": {
+    "model": "granite3.3:8b",
+    "url": "http://localhost:11434/api/chat"
+  },
+  "openai": {
+    "model": "gpt-4o",
+    "api_key": "sk-..." // Replace with your actual key or load this securely
+  }
+}
