@@ -137,7 +137,7 @@ def stream_vertexai(prompt: str, sse: bool) -> Generator[str, None, None]:
         f"https://{VERTEX_REGION}-aiplatform.googleapis.com/v1/projects/"
         f"{VERTEX_PROJECT_ID}/locations/{VERTEX_REGION}/publishers/"
         f"{config['vertex'].get('publisher', 'mistralai')}/models/"
-        f"{VERTEX_MODEL_ID}:streamChatCompletions"
+        f"{VERTEX_MODEL_ID}:streamRawPredict"
     )
 
     headers = {
