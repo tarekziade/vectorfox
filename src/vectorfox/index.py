@@ -150,16 +150,22 @@ def crawl_and_index(start_url: str):
 
             source_text = rst_text or html_text
 
-            documents = [models.Document(text=source_text, model=MODEL_NAME)]
-            payloads = [{"url": url, "text": documents[0]}]
-            ids = [hash_id(url)]
-
+            chunks = chunk_text(source_text, max_tokens=300)  # adjustable granularity
+            documents = [
+                models.Document(text=chunk, model=MODEL_NAME) for chunk in chunks
+            ]
+            payloads = [
+                {"url": url, "chunk_index": i, "text": chunk}
+                for i, chunk in enumerate(chunks)
+            ]
+            ids = [hash_id(f"{url}#{i}") for i in range(len(chunks))]
             client.upload_collection(
                 collection_name=COLLECTION_NAME,
                 vectors=documents,
                 ids=ids,
                 payload=payloads,
             )
+
             queue.extend(
                 [normalize_url(l) for l in new_links if normalize_url(l) not in VISITED]
             )
@@ -167,6 +173,10 @@ def crawl_and_index(start_url: str):
             pbar.update(1)
 
 
-if __name__ == "__main__":
+def main():
     os.makedirs(QDRANT_PATH, exist_ok=True)
     crawl_and_index(BASE_URL)
+
+
+if __name__ == "__main__":
+    main()

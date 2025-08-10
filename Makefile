@@ -13,10 +13,15 @@ all: setup
 
 setup:
 	$(PYTHON) -m venv $(VENV)
-	. $(VENV)/bin/activate && pip install --upgrade pip && pip install -r $(REQS)
+	$(VENV)/bin/pip install --upgrade pip 
+	$(VENV)/bin/pip install -r $(REQS)
+	$(VENV)/bin/pip install -e .
+  
+index:
+	$(VENV)/bin/vectorfox-index
 
 run:
-	. $(VENV)/bin/activate && $(PYTHON) $(SCRIPT)
+	$(VENV)/bin/vectorweb
 
 qdrant-up:
 	docker run -d --rm \
@@ -26,7 +31,7 @@ qdrant-up:
 		qdrant/qdrant
 
 search:
-	. $(VENV)/bin/activate && $(PYTHON) cli.py "$(q)"
+	$(VENV)/bin/vectorfox "$(q)"
 
 clean:
 	rm -rf __pycache__ .cache $(VENV)
