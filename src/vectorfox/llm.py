@@ -109,16 +109,28 @@ def stream_openai(model: str, system_prompt: str, user_prompt: str, sse: bool):
         yield wrap(f"OpenAI error: {str(e)}")
 
 
+def get_access_token() -> str:
+    process = subprocess.Popen(
+        "gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/cloud-platform",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+    )
+    access_token_bytes, error_bytes = process.communicate()
+    if process.returncode != 0:
+        raise RuntimeError(f"Failed to get access token: {error_bytes.decode()}")
+    return access_token_bytes.decode("utf-8").strip()
+
+
 def stream_vertexai(prompt: str, sse: bool) -> Generator[str, None, None]:
     def wrap(msg):
         return f"data: {msg}\n\n" if sse else msg
 
-    # Get access token via gcloud subprocess
-    process = subprocess.Popen(
-        "gcloud auth print-access-token", stdout=subprocess.PIPE, shell=True
-    )
-    access_token_bytes, _ = process.communicate()
-    access_token = access_token_bytes.decode("utf-8").strip()
+    try:
+        access_token = get_access_token()
+    except RuntimeError as e:
+        yield wrap(f"Token error: {str(e)}")
+        return
 
     url = (
         f"https://{VERTEX_REGION}-aiplatform.googleapis.com/v1/projects/"
