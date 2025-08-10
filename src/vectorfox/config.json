@@ -11,6 +11,7 @@
   "vertex": {
     "region": "us-central1",
     "project_id": "my-gcp-project",
-    "model_id": "mistral-7b-instruct"
+    "model_id": "mistral-7b-instruct",
+    "publisher": "mistralai"
   }
 }

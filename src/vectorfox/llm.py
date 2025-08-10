@@ -132,31 +132,49 @@ def stream_vertexai(prompt: str, sse: bool) -> Generator[str, None, None]:
         yield wrap(f"Token error: {str(e)}")
         return
 
+    # OpenAI-compatible streaming endpoint for Vertex AI
     url = (
         f"https://{VERTEX_REGION}-aiplatform.googleapis.com/v1/projects/"
         f"{VERTEX_PROJECT_ID}/locations/{VERTEX_REGION}/publishers/"
-        f"mistralai/models/{VERTEX_MODEL_ID}:rawPredict"
+        f"{config['vertex'].get('publisher', 'mistralai')}/models/"
+        f"{VERTEX_MODEL_ID}:streamChatCompletions"
     )
 
-    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "X-Goog-User-Project": VERTEX_PROJECT_ID,  # required for quota/billing
+    }
 
     payload = {
         "model": VERTEX_MODEL_ID,
-        "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "stream": True,
     }
 
-    response = requests.post(url, headers=headers, json=payload)
-
-    if response.status_code != 200:
-        yield wrap(f"Vertex AI error: {response.status_code} {response.text}")
-        return
-
     try:
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-        yield wrap(content)
+        response = requests.post(url, headers=headers, json=payload, stream=True)
+
+        if response.status_code != 200:
+            yield wrap(f"Vertex AI error: {response.status_code} {response.text}")
+            return
+
+        for line in response.iter_lines(decode_unicode=True):
+            if line and line.startswith("data: "):
+                data = line.removeprefix("data: ").strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(data)
+                    content = delta["choices"][0].get("delta", {}).get("content", "")
+                    if content:
+                        yield wrap(content)
+                except Exception as e:
+                    yield wrap(f"[stream error] {e}")
+
     except Exception as e:
-        yield wrap(f"Error parsing Vertex response: {str(e)}\nRaw: {response.text}")
+        yield wrap(f"Request failed: {str(e)}")
 
     yield wrap("[DONE]")
 
